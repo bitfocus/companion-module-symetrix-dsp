@@ -4,3 +4,5 @@
 - Add a **NOP** (No Operation) command interval to check if connection is still healty. _(This command will make no adjustments to the DSP, but send an **ACK** if a healthy connection is active.)_
 
 - Improve dB's in control_value feedback. Right now it will always assume a fader has a range of -72 and +12. This can be changed in Composer, so a input field defining the rage could do the trick?!
+
+- Improve file structure (seperate files so index.js is beter legible)
