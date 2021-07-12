@@ -1,6 +1,10 @@
 const instance_skel = require('../../instance_skel')
 const tcp = require('../../tcp')
 
+const presets = require('./presets')
+const actions = require('./actions')
+const feedbacks = require('./feedbacks')
+
 let debug
 let log
 
@@ -31,9 +35,7 @@ function instance(system, id, config) {
 
 	// super-constructor
 	instance_skel.apply(this, arguments)
-
 	self.actions()
-
 	return self
 }
 
@@ -52,7 +54,6 @@ instance.GetUpgradeScripts = function () {
  */
 instance.prototype.updateConfig = function (config) {
 	let self = this
-
 	self.config = config
 
 	self.log('debug', 'Updating configuration.')
@@ -114,9 +115,9 @@ instance.prototype.init = function () {
 
 	self.states = {}
 
-	self.init_presets()
-	self.init_variables()
-	self.init_feedbacks()
+	self.initPresets()
+	self.initVariables()
+	self.initFeedbacks()
 
 	self.disable = false
 
@@ -296,6 +297,8 @@ instance.prototype.destroy = function () {
 	if (self.tcp !== undefined) {
 		self.tcp.destroy()
 	}
+
+	debug('destroy', self.id)
 }
 
 /**
@@ -305,153 +308,7 @@ instance.prototype.destroy = function () {
 instance.prototype.actions = function () {
 	let self = this
 
-	self.setActions({
-		flash_dsp: {
-			label: 'Flash DSP',
-			options: [
-				{
-					type: 'number',
-					id: 'amout_flashes',
-					label: 'Flashes',
-					tooltip: 'Amount the unit will flash',
-					default: 4,
-					min: 1,
-					max: 20,
-					range: false,
-					required: true,
-					width: 4,
-				},
-			],
-		},
-		reboot_dsp: {
-			label: 'Reboot DSP',
-		},
-		get_latest_preset: {
-			label: 'Get Latest Preset',
-		},
-		load_global_preset: {
-			label: 'Load Global Preset',
-			options: [
-				{
-					type: 'number',
-					id: 'preset_number',
-					label: 'Preset number',
-					tooltip: 'Number of preset',
-					default: 1,
-					min: 1,
-					max: 1000,
-					range: false,
-					required: true,
-					width: 4,
-				},
-			],
-		},
-		load_preset: {
-			label: 'Load Preset',
-			options: [
-				{
-					type: 'number',
-					id: 'preset_number',
-					label: 'Preset number',
-					tooltip: 'Number of preset',
-					default: 1,
-					min: 1,
-					max: 1000,
-					range: false,
-					required: true,
-					width: 4,
-				},
-			],
-		},
-		set_value: {
-			label: 'Set Value',
-			options: [
-				{
-					type: 'number',
-					id: 'control_number',
-					label: 'Control number',
-					tooltip: 'Number of control',
-					default: 1,
-					min: 1,
-					max: 1000,
-					range: false,
-					required: true,
-					width: 4,
-				},
-				{
-					type: 'number',
-					id: 'control_value',
-					label: 'Control value (min: 0 / max: 65535)',
-					tooltip: 'Value of control (min: 0 / max: 65535)',
-					default: 1,
-					min: 0,
-					max: 65535,
-					range: false,
-					required: true,
-					width: 4,
-				},
-			],
-		},
-		change_value: {
-			label: 'Change Value',
-			options: [
-				{
-					type: 'number',
-					id: 'control_number',
-					label: 'Control number',
-					tooltip: 'Number of control',
-					default: 1,
-					min: 1,
-					max: 1000,
-					range: false,
-					required: true,
-					width: 2,
-				},
-				{
-					type: 'dropdown',
-					id: 'change_type',
-					label: 'Inc / Dec',
-					default: '1',
-					tooltip: 'Increase or Decrease',
-					choices: [
-						{ id: '1', label: 'Increase' },
-						{ id: '0', label: 'Decrease' },
-					],
-					required: true,
-					width: 2,
-				},
-				{
-					type: 'number',
-					id: 'control_value',
-					label: 'Control value (min: 0 / max: 65535)',
-					tooltip: 'Value of control (min: 0 / max: 65535)',
-					default: 1,
-					min: 0,
-					max: 65535,
-					range: false,
-					required: true,
-					width: 2,
-				},
-			],
-		},
-		toggle_on_off: {
-			label: 'On / Off',
-			options: [
-				{
-					type: 'number',
-					id: 'control_number',
-					label: 'Control number',
-					tooltip: 'Number of control',
-					default: 1,
-					min: 1,
-					max: 1000,
-					range: false,
-					required: true,
-					width: 4,
-				},
-			],
-		},
-	})
+	self.setActions(actions.getActions(self))
 }
 
 /**
@@ -490,7 +347,7 @@ instance.prototype.action = function (action) {
 
 		case 'toggle_on_off':
 			if (self.states[`control_number_${action.options.control_number}`] === 0) {
-				self.tcp.send(`CS ${action.options.control_number} ${65535}\r\n`)
+				self.tcp.send(`CS ${action.options.control_number} ${action.options.on_value}\r\n`)
 			} else {
 				self.tcp.send(`CS ${action.options.control_number} ${0}\r\n`)
 				break
@@ -521,79 +378,10 @@ instance.prototype.action = function (action) {
  * Define the feedbacks for Companion
  * @since 1.0.0
  */
-instance.prototype.init_feedbacks = function () {
+instance.prototype.initFeedbacks = function () {
 	let self = this
 
-	let feedbacks = {}
-
-	feedbacks['connected'] = {
-		type: 'boolean',
-		label: 'Connected to DSP',
-		description: 'If Companion is connected to DSP, change the style of the button',
-		style: {
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 204, 0),
-		},
-	}
-
-	feedbacks['control_value'] = {
-		label: 'Dynamic Control Value',
-		description: 'This will add a new rule underneath the button text with the current value of control number',
-		options: [
-			{
-				type: 'textinput',
-				id: 'button_text',
-				label: 'Button text',
-				width: 4,
-				default: '',
-			},
-			{
-				type: 'number',
-				label: 'Control Number',
-				id: 'control_number',
-				default: 1,
-				min: 1,
-				max: 1000,
-				range: false,
-				required: true,
-			},
-			{
-				type: 'dropdown',
-				label: 'Unit type',
-				id: 'unit_type',
-				default: 'dB',
-				choices: [
-					{ id: 'bin', label: 'Binary' },
-					{ id: '%', label: 'Percentage' },
-					{ id: 'dB', label: "dB's" },
-				],
-			},
-		],
-	}
-
-	feedbacks['on_off_value'] = {
-		type: 'boolean',
-		label: 'On / Off',
-		description: 'This will check if the value of a control value is off (0) or on (> 0)',
-		style: {
-			color: self.rgb(255, 255, 255),
-			bgcolor: self.rgb(0, 204, 0),
-		},
-		options: [
-			{
-				type: 'number',
-				label: 'Control Number',
-				id: 'control_number',
-				default: 1,
-				min: 1,
-				max: 1000,
-				range: false,
-				required: true,
-			},
-		],
-	}
-
-	self.setFeedbackDefinitions(feedbacks)
+	self.setFeedbackDefinitions(feedbacks.getFeedbacks(self))
 }
 
 /**
@@ -658,480 +446,24 @@ instance.prototype.feedback = function (feedback) {
 }
 
 /**
- * Define the preset buttons for Companion
- * @since 1.0.0
- */
-instance.prototype.init_presets = function () {
-	let self = this
-
-	const presets = []
-
-	presets.push(
-		{
-			category: 'General',
-			label: 'Flash DSP',
-			bank: {
-				style: 'text',
-				text: 'Flash\\nDSP',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'flash_dsp',
-					options: {
-						amout_flashes: 4,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Setup',
-			label: 'Load Preset',
-			bank: {
-				style: 'text',
-				text: 'Load\\nPreset',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'load_preset',
-					options: {
-						preset_number: 1,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Setup',
-			label: 'Load Global Preset',
-			bank: {
-				style: 'text',
-				text: 'Load\\nGlobal\\nPreset',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'load_global_preset',
-					options: {
-						preset_number: 1,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'General',
-			label: 'Reboot DSP',
-			bank: {
-				style: 'text',
-				text: 'Reboot\\nDSP',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'reboot_dsp',
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: 'PTT',
-			bank: {
-				style: 'text',
-				text: 'PTT',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'set_value',
-					options: {
-						control_number: 1,
-						control_value: 65535,
-					},
-				},
-			],
-			release_actions: [
-				{
-					action: 'set_value',
-					options: {
-						control_number: 1,
-						control_value: 0,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'on_off_value',
-					style: {
-						bgcolor: self.rgb(255, 0, 0),
-						color: self.rgb(255, 255, 255),
-					},
-					options: {
-						control_number: 1,
-					},
-				},
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: 'Toggle',
-			bank: {
-				style: 'text',
-				text: 'Toggle',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'toggle_on_off',
-					options: {
-						control_number: 1,
-					},
-				},
-			],
-			release_actions: [],
-			feedbacks: [
-				{
-					type: 'on_off_value',
-					style: {
-						bgcolor: self.rgb(255, 0, 0),
-						color: self.rgb(255, 255, 255),
-					},
-					options: {
-						control_number: 1,
-					},
-				},
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '0 dB',
-			bank: {
-				style: 'text',
-				text: '0 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'set_value',
-					options: {
-						control_number: 1,
-						control_value: 56175,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '+1 dB',
-			bank: {
-				style: 'text',
-				text: '+1 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 1,
-						control_value: 780,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '+2 dB',
-			bank: {
-				style: 'text',
-				text: '+2 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 1,
-						control_value: 1560,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '+3 dB',
-			bank: {
-				style: 'text',
-				text: '+3 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 1,
-						control_value: 2340,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '-1 dB',
-			bank: {
-				style: 'text',
-				text: '-1 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 0,
-						control_value: 780,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '-2 dB',
-			bank: {
-				style: 'text',
-				text: '-2 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 0,
-						control_value: 1560,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Change Values',
-			label: '-3 dB',
-			bank: {
-				style: 'text',
-				text: '-3 dB',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: 0,
-				latch: false,
-			},
-			actions: [
-				{
-					action: 'change_value',
-					options: {
-						control_number: 1,
-						change_type: 0,
-						control_value: 2340,
-					},
-				},
-			],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Info',
-			label: 'Connected',
-			bank: {
-				style: 'text',
-				text: 'Connected\\nto\\nDSP',
-				size: '7',
-				color: self.rgb(255, 255, 255),
-				bgcolor: self.rgb(255, 0, 0),
-				latch: false,
-			},
-			actions: [],
-			release_actions: [],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						bgcolor: self.rgb(0, 204, 0),
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		},
-		{
-			category: 'Info',
-			label: 'Last Preset',
-			bank: {
-				style: 'text',
-				text: 'Last\\nPreset:\\n#$(symetrix:last_preset)',
-				size: '18',
-				color: self.rgb(130, 130, 130),
-				bgcolor: self.rgb(30, 30, 30),
-				latch: false,
-			},
-			actions: [],
-			release_actions: [],
-			feedbacks: [
-				{
-					type: 'connected',
-					style: {
-						color: self.rgb(255, 255, 255),
-					},
-				},
-			],
-		}
-	)
-
-	self.setPresetDefinitions(presets)
-}
-
-/**
  * Define the dynamic variables for Companion
  * @since 1.0.0
  */
-instance.prototype.init_variables = function () {
+instance.prototype.initVariables = function () {
 	let self = this
 
 	self.setVariableDefinitions(self.variables)
 }
 
-instance_skel.extendedBy(instance)
+/**
+ * Define the preset buttons for Companion
+ * @since 1.0.0
+ */
+instance.prototype.initPresets = function () {
+	let self = this
 
+	self.setPresetDefinitions(presets.getPresets(self))
+}
+
+instance_skel.extendedBy(instance)
 exports = module.exports = instance

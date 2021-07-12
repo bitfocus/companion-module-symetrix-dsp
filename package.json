@@ -9,7 +9,7 @@
 	],
 	"manufacturer": "Symetrix",
 	"product": "DSP",
-	"shortname": "Symetrix",
+	"shortname": "symetrix",
 	"description": "Symetrix DSP plugin for companion",
 	"main": "index.js",
 	"scripts": {},
