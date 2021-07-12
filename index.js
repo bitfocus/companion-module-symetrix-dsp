@@ -99,8 +99,9 @@ instance.prototype.setControlNumberVariable = function (control_number, control_
 	self.states[`control_number_${control_number}`] = control_value
 	self.setVariable(`control_number_${control_number}`, control_value)
 
-	// Trigger on/off feedback
+	// Trigger on/off and control_value feedback
 	self.checkFeedbacks('on_off_value')
+	self.checkFeedbacks('control_value')
 }
 
 /**
@@ -535,6 +536,41 @@ instance.prototype.init_feedbacks = function () {
 		},
 	}
 
+	feedbacks['control_value'] = {
+		label: 'Dynamic Control Value',
+		description: 'This will add a new rule underneath the button text with the current value of control number',
+		options: [
+			{
+				type: 'textinput',
+				id: 'button_text',
+				label: 'Button text',
+				width: 4,
+				default: '',
+			},
+			{
+				type: 'number',
+				label: 'Control Number',
+				id: 'control_number',
+				default: 1,
+				min: 1,
+				max: 1000,
+				range: false,
+				required: true,
+			},
+			{
+				type: 'dropdown',
+				label: 'Unit type',
+				id: 'unit_type',
+				default: 'dB',
+				choices: [
+					{ id: 'bin', label: 'Binary' },
+					{ id: '%', label: 'Percentage' },
+					{ id: 'dB', label: "dB's" },
+				],
+			},
+		],
+	}
+
 	feedbacks['on_off_value'] = {
 		type: 'boolean',
 		label: 'On / Off',
@@ -580,6 +616,16 @@ instance.prototype.feedback = function (feedback) {
 	if (feedback.type === 'on_off_value') {
 		if (self.states[`control_number_${feedback.options.control_number}`] > 0) {
 			return true
+		}
+	}
+
+	if (feedback.type === 'control_value') {
+		return {
+			text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${
+				self.states[`control_number_${feedback.options.control_number}`] !== undefined
+					? Number(Math.floor(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)))
+					: '#N/A'
+			} ${feedback.options.unit_type}`,
 		}
 	}
 
@@ -734,6 +780,45 @@ instance.prototype.init_presets = function () {
 					},
 				},
 			],
+			feedbacks: [
+				{
+					type: 'on_off_value',
+					style: {
+						bgcolor: self.rgb(255, 0, 0),
+						color: self.rgb(255, 255, 255),
+					},
+					options: {
+						control_number: 1,
+					},
+				},
+				{
+					type: 'connected',
+					style: {
+						color: self.rgb(255, 255, 255),
+					},
+				},
+			],
+		},
+		{
+			category: 'Change Values',
+			label: 'Toggle',
+			bank: {
+				style: 'text',
+				text: 'Toggle',
+				size: '18',
+				color: self.rgb(130, 130, 130),
+				bgcolor: 0,
+				latch: false,
+			},
+			actions: [
+				{
+					action: 'toggle_on_off',
+					options: {
+						control_number: 1,
+					},
+				},
+			],
+			release_actions: [],
 			feedbacks: [
 				{
 					type: 'on_off_value',
