@@ -21,7 +21,7 @@ This module will allow you to control your Symetrix DSP using TCP commands and r
 - load_global_preset
 - get_latest_preset _(Will get the latest recalled preset from DSP to send to feedback in case a preset is recalled from SymView)_
 
-**Setup**
+**Change control values**
 
 - set_value _(Set control number to a specific number 0 - 65535)_
 - change_value _(Set control number to a specific number 0 - 65535)_
