@@ -5,6 +5,21 @@ let debug
 let log
 
 /**
+ * Dynamic list of variables
+ * @since 1.0.2
+ */
+instance.prototype.variables = [
+	{
+		name: 'connected',
+		label: 'Companion connected to DSP (boolean)',
+	},
+	{
+		name: 'last_preset',
+		label: 'Last recalled preset',
+	},
+]
+
+/**
  * Create a new instance of class ip-serial
  * @param {EventEmitter} system - event processor/scheduler
  * @param {String} id - unique identifier of this instance
@@ -48,6 +63,44 @@ instance.prototype.updateConfig = function (config) {
 	}
 
 	self.init()
+}
+
+/**
+ * Create a new instance of class ip-serial
+ * @param {String} control_number - event processor/scheduler
+ * @param {String} control_value - unique identifier of this instance
+ * @since 1.0.2
+ */
+instance.prototype.setControlNumberVariable = function (control_number, control_value) {
+	let self = this
+
+	// Check if variables already has been declared for specific control number
+	let foundControlNumberVariable = false
+
+	// Loop through existing variables to find the control number
+	for (let i = 0; i < self.variables.length; i++) {
+		if (self.variables[i].name === `control_number_${control_number}`) {
+			foundControlNumberVariable = true
+			break
+		}
+	}
+
+	// If control number has no variable yet, create one
+	if (!foundControlNumberVariable) {
+		self.variables.push({
+			name: `control_number_${control_number}`,
+			label: `Control Number #${control_number}`,
+		})
+
+		self.setVariableDefinitions(self.variables)
+	}
+
+	// Set state and variable
+	self.states[`control_number_${control_number}`] = control_value
+	self.setVariable(`control_number_${control_number}`, control_value)
+
+	// Trigger on/off feedback
+	self.checkFeedbacks('on_off_value')
 }
 
 /**
@@ -100,18 +153,25 @@ instance.prototype.init = function () {
 		self.tcp.send('$e GPR\r\n')
 
 		// Get states for all push enabled controllers (GPU)
-		self.tcp.send('$e GS 51\r\n')
+		self.tcp.send('$v GPU\r\n')
 	})
 
 	// Catch incomming data from TCP connection
 	self.tcp.on('data', function (data) {
-		const message = data.toString().trim()
+		const message = data.toString('utf8').trim()
 
 		if (message === 'ACK') return
 
-		// Check if data is from a set command used in combo with $e (LP, LPG, GS)
-		if (/{([A-Z]+)\s([0-9]+)(?:\s([0-9]+))?}\sACK/.test(message)) {
-			const command = message.match(/{([A-Z]+)\s([0-9]+)(?:\s([0-9]+))?}\sACK/)
+		// Check if data is from a 'push enabled' control number
+		if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
+			const command = message.match(/\#([0-9]+)\=([0-9]+)/)
+
+			self.setControlNumberVariable(Number(command[1]), Number(command[2]))
+		}
+
+		// Check if data is from a set command used in combo with $e (LP, LPG)
+		else if (/{([A-Z]+)\s([0-9]+)}\sACK/.test(message)) {
+			const command = message.match(/{([A-Z]+)\s([0-9]+)}\sACK/)
 
 			switch (command[1]) {
 				case 'LP':
@@ -124,25 +184,23 @@ instance.prototype.init = function () {
 					self.setVariable('last_preset', self.states['last_preset'])
 					break
 
-				case 'GS':
-					self.states[`control_number_${Number(command[1])}`] = Number(command[2])
-					self.checkFeedbacks('control_value')
-					self.checkFeedbacks('on_off_value')
-					break
-
 				default:
 					break
 			}
 		}
 
 		// Check if data is from a get command used in combo with $e (GPR)
-		else if (/{([A-Z]+)}\s([a-zA-Z0-9]+)/.test(message)) {
-			const command = message.match(/{([A-Z]+)}\s([a-zA-Z0-9]+)/)
+		else if (/{([A-Z]+)(?:\s([0-9]+))?}\s([a-zA-Z0-9]+)/.test(message)) {
+			const command = message.match(/{([A-Z]+)(?:\s([0-9]+))?}\s([a-zA-Z0-9]+)/)
 
 			switch (command[1]) {
 				case 'GPR':
-					self.states['last_preset'] = Number(command[2])
+					self.states['last_preset'] = Number(command[3])
 					self.setVariable('last_preset', self.states['last_preset'])
+					break
+
+				case 'GS':
+					self.setControlNumberVariable(Number(command[2]), Number(command[3]))
 					break
 
 				default:
@@ -150,13 +208,22 @@ instance.prototype.init = function () {
 			}
 		}
 
-		// Check if data is from a 'push enabled' control number
-		else if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
-			const command = message.match(/\#([0-9]+)\=([0-9]+)/)
+		// Check if data is from the GPU command to get all push enabled controllers
+		else if (message.includes('controllers in range 1 to 10000 enabled for push')) {
+			const pushEnabledControlNumbers = message
+				.split('\r\n')
+				.slice(1, -1)
+				.map(function (number) {
+					return number.trim()
+				})
 
-			self.states[`control_number_${Number(command[1])}`] = Number(command[2])
-			self.checkFeedbacks('control_value')
-			self.checkFeedbacks('on_off_value')
+			// Loop through all Push enabled controllers and get their values.
+			for (let i = 0; i < pushEnabledControlNumbers.length; i++) {
+				// Adding a small delay between TCP commands
+				setTimeout(function timer() {
+					self.tcp.send(`$e GS ${pushEnabledControlNumbers[i]}\r\n`)
+				}, i * 50)
+			}
 		}
 	})
 
@@ -223,14 +290,11 @@ instance.prototype.destroy = function () {
 
 	self.states = {}
 	self.feedbacks = {}
+	self.variables = []
 
 	if (self.tcp !== undefined) {
 		self.tcp.destroy()
 	}
-
-	self.states['connected'] = false
-	self.setVariable('connected', self.states['connected'])
-	self.checkFeedbacks('connected')
 }
 
 /**
@@ -471,41 +535,6 @@ instance.prototype.init_feedbacks = function () {
 		},
 	}
 
-	feedbacks['control_value'] = {
-		label: 'Dynamic Control Value',
-		description: 'This will add a new rule underneath the button text with the current value of control number',
-		options: [
-			{
-				type: 'textinput',
-				id: 'button_text',
-				label: 'Button text',
-				width: 4,
-				default: '',
-			},
-			{
-				type: 'number',
-				label: 'Control Number',
-				id: 'control_number',
-				default: 1,
-				min: 1,
-				max: 1000,
-				range: false,
-				required: true,
-			},
-			{
-				type: 'dropdown',
-				label: 'Unit type',
-				id: 'unit_type',
-				default: 'dB',
-				choices: [
-					{ id: 'bin', label: 'Binary' },
-					{ id: '%', label: 'Percentage' },
-					{ id: 'dB', label: "dB's" },
-				],
-			},
-		],
-	}
-
 	feedbacks['on_off_value'] = {
 		type: 'boolean',
 		label: 'On / Off',
@@ -546,15 +575,9 @@ instance.prototype.feedback = function (feedback) {
 		if (self.states['connected'] === true) {
 			return true
 		}
-	} else if (feedback.type === 'control_value') {
-		return {
-			text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${
-				self.states[`control_number_${feedback.options.control_number}`] !== undefined
-					? Number(Math.floor(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)))
-					: '#N/A'
-			} ${feedback.options.unit_type}`,
-		}
-	} else if (feedback.type === 'on_off_value') {
+	}
+
+	if (feedback.type === 'on_off_value') {
 		if (self.states[`control_number_${feedback.options.control_number}`] > 0) {
 			return true
 		}
@@ -967,18 +990,7 @@ instance.prototype.init_presets = function () {
 instance.prototype.init_variables = function () {
 	let self = this
 
-	const variables = [
-		{
-			name: 'connected',
-			label: 'Companion connected to DSP (boolean)',
-		},
-		{
-			name: 'last_preset',
-			label: 'Last recalled preset',
-		},
-	]
-
-	self.setVariableDefinitions(variables)
+	self.setVariableDefinitions(self.variables)
 }
 
 instance_skel.extendedBy(instance)
