@@ -620,12 +620,37 @@ instance.prototype.feedback = function (feedback) {
 	}
 
 	if (feedback.type === 'control_value') {
+		if (self.states[`control_number_${feedback.options.control_number}`] !== undefined) {
+			switch (feedback.options.unit_type) {
+				case 'dB':
+					// Still need to add fader min and max values. Default to -72 and +12
+					return {
+						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
+							Math.floor(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535))
+						)} dB`,
+					}
+
+				case '%':
+					return {
+						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
+							100 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)
+						).toFixed(1)}%`,
+					}
+
+				case 'bin':
+					return {
+						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
+							self.states[`control_number_${feedback.options.control_number}`]
+						)}`,
+					}
+
+				default:
+					break
+			}
+		}
+
 		return {
-			text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${
-				self.states[`control_number_${feedback.options.control_number}`] !== undefined
-					? Number(Math.floor(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)))
-					: '#N/A'
-			} ${feedback.options.unit_type}`,
+			text: `${feedback.options.button_text ? feedback.options.button_text : ''}`,
 		}
 	}
 
@@ -830,6 +855,35 @@ instance.prototype.init_presets = function () {
 						control_number: 1,
 					},
 				},
+				{
+					type: 'connected',
+					style: {
+						color: self.rgb(255, 255, 255),
+					},
+				},
+			],
+		},
+		{
+			category: 'Change Values',
+			label: '0 dB',
+			bank: {
+				style: 'text',
+				text: '0 dB',
+				size: '18',
+				color: self.rgb(130, 130, 130),
+				bgcolor: 0,
+				latch: false,
+			},
+			actions: [
+				{
+					action: 'set_value',
+					options: {
+						control_number: 1,
+						control_value: 56175,
+					},
+				},
+			],
+			feedbacks: [
 				{
 					type: 'connected',
 					style: {
