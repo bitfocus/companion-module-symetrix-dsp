@@ -254,11 +254,11 @@ instance.prototype.config_fields = function () {
 					The Symetrix DSP module is based on the very generic setup of <strong>Composer 8.0</strong>, and so is the module.<br>
 					There can be some functionality missing or not working as expected. If so, please open an issue in the repo.<br>
 					<br>
+					<a href="https://github.com/bitfocus/companion-module-symetrix-dsp/issues/new" target="_new" class="btn btn-success">Create a new issue</a>
+					<a href="https://github.com/bitfocus/companion-module-symetrix-dsp/issues" target="_new" class="btn btn-warning mr-1">See current issues</a><br>
+					<br>
 					Keep in mind that all actions, feedbacks and variables are subjected to change when this module is futher developed.<br>
 					This could mean existing buttons in your setup won't work after an update!<br>
-					</br>
-					<a href="https://github.com/bitfocus/companion-module-symetrix-dsp/issues/new" target="_new" class="btn btn-success">Create a new issue</a>
-					<a href="https://github.com/bitfocus/companion-module-symetrix-dsp/issues" target="_new" class="btn btn-warning mr-1">See current issues</a>
 				</div>
 			`,
 		},

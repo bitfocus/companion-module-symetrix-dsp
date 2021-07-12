@@ -49,7 +49,7 @@ exports.getFeedbacks = function (self) {
 	feedbacks['on_off_value'] = {
 		type: 'boolean',
 		label: 'On / Off',
-		description: 'This will check if the value of a control value is off (0) or on (> 0)',
+		description: 'This will check if the value of a control number is off (0) or on (> 0)',
 		style: {
 			color: self.rgb(255, 255, 255),
 			bgcolor: self.rgb(0, 204, 0),
