@@ -68,8 +68,8 @@ instance.prototype.updateConfig = function (config) {
 
 /**
  * Create a new instance of class ip-serial
- * @param {String} control_number - event processor/scheduler
- * @param {String} control_value - unique identifier of this instance
+ * @param {Number} control_number - number of control number
+ * @param {Number} control_value - value of control number
  * @since 1.0.2
  */
 instance.prototype.setControlNumberVariable = function (control_number, control_value) {
