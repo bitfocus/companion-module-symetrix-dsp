@@ -98,14 +98,16 @@ instance.prototype.init = function () {
 
 		// Get Last recalled preset (GRP)
 		self.tcp.send('$e GPR\r\n')
+
+		// Get states for all push enabled controllers (GPU)
+		self.tcp.send('$e GS 51\r\n')
 	})
 
 	// Catch incomming data from TCP connection
 	self.tcp.on('data', function (data) {
 		const message = data.toString().trim()
 
-		// NOT WORKING YET
-		if (message == 'ACK\r\n') return
+		if (message === 'ACK') return
 
 		// Check if data is from a set command used in combo with $e (LP, LPG, GS)
 		if (/{([A-Z]+)\s([0-9]+)(?:\s([0-9]+))?}\sACK/.test(message)) {
