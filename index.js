@@ -9,21 +9,6 @@ let debug
 let log
 
 /**
- * Dynamic list of variables
- * @since 1.0.2
- */
-instance.prototype.variables = [
-	{
-		name: 'connected',
-		label: 'Companion connected to DSP (boolean)',
-	},
-	{
-		name: 'last_preset',
-		label: 'Last recalled preset',
-	},
-]
-
-/**
  * Create a new instance of class ip-serial
  * @param {EventEmitter} system - event processor/scheduler
  * @param {String} id - unique identifier of this instance
@@ -35,16 +20,10 @@ function instance(system, id, config) {
 
 	// super-constructor
 	instance_skel.apply(this, arguments)
-	self.actions()
-	return self
-}
 
-instance.GetUpgradeScripts = function () {
-	return [
-		instance_skel.CreateConvertToBooleanFeedbackUpgradeScript({
-			connected: true,
-		}),
-	]
+	self.actions()
+	
+	return self
 }
 
 /**
@@ -114,6 +93,13 @@ instance.prototype.init = function () {
 	let self = this
 
 	self.states = {}
+	self.feedbacks = {}
+	self.variables = [
+		{
+			name: 'last_preset',
+			label: 'Last recalled preset',
+		},
+	]
 
 	self.initPresets()
 	self.initVariables()
@@ -138,6 +124,8 @@ instance.prototype.init = function () {
 	self.tcp.on('error', function (error) {
 		self.status(self.STATUS_ERROR)
 		self.log('error', error)
+
+		self.checkFeedbacks('connected')
 	})
 
 	// Catch connect
@@ -147,8 +135,6 @@ instance.prototype.init = function () {
 		self.debug('Connected to DSP')
 		self.log('info', 'Connected to Control TCP.')
 
-		self.states['connected'] = true
-		self.setVariable('connected', self.states['connected'])
 		self.checkFeedbacks('connected')
 
 		// Get Last recalled preset (GRP)
@@ -165,8 +151,8 @@ instance.prototype.init = function () {
 		if (message === 'ACK') return
 
 		// Check if data is from a 'push enabled' control number
-		if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
-			const command = message.match(/\#([0-9]+)\=([0-9]+)/)
+		if (/\\#([0-9]+)\\=([0-9]+)/.test(message)) {
+			const command = message.match(/\\#([0-9]+)\\=([0-9]+)/)
 
 			self.setControlNumberVariable(Number(command[1]), Number(command[2]))
 		}
@@ -298,6 +284,10 @@ instance.prototype.destroy = function () {
 		self.tcp.destroy()
 	}
 
+	self.disable = true
+
+	self.checkFeedbacks('connected')
+
 	debug('destroy', self.id)
 }
 
@@ -318,13 +308,15 @@ instance.prototype.actions = function () {
 instance.prototype.action = function (action) {
 	let self = this
 
+	let cmd;
+
 	if (action.action == 'reconnect') {
 		self.log('warn', 'Reconnecting to TCP.')
 		self.init()
 		return
 	}
 
-	if (!self.tcp || !self.states['connected']) {
+	if (!self.tcp || !self.tcp.connected) {
 		self.log('warn', 'Unable to perform action, connection lost to TCP')
 		self.init()
 		return
@@ -332,45 +324,47 @@ instance.prototype.action = function (action) {
 
 	switch (action.action) {
 		case 'flash_dsp':
-			self.tcp.send(`FU ${action.options.amout_flashes}\r\n`)
+			cmd = `FU ${action.options.amout_flashes}`
 			break
 
 		case 'set_value':
-			self.tcp.send(`CS ${action.options.control_number} ${action.options.control_value}\r\n`)
+			cmd = `CS ${action.options.control_number} ${action.options.control_value}`
 			break
 
 		case 'change_value':
-			self.tcp.send(
-				`CC ${action.options.control_number} ${action.options.change_type} ${action.options.control_value}\r\n`
-			)
+			cmd = `CC ${action.options.control_number} ${action.options.change_type} ${action.options.control_value}`
 			break
 
 		case 'toggle_on_off':
 			if (self.states[`control_number_${action.options.control_number}`] === 0) {
-				self.tcp.send(`CS ${action.options.control_number} ${action.options.on_value}\r\n`)
+				cmd = `CS ${action.options.control_number} ${action.options.on_value}`
+				break
 			} else {
-				self.tcp.send(`CS ${action.options.control_number} ${0}\r\n`)
+				cmd = `CS ${action.options.control_number} ${0}`
 				break
 			}
 
-			self.log('warn', `Could not get current value for control number ${action.options.control_number}`)
-			break
-
 		case 'load_preset':
-			self.tcp.send(`$e LP ${action.options.preset_number}\r\n`)
+			cmd = `$e LP ${action.options.preset_number}`
 			break
 
 		case 'load_global_preset':
-			self.tcp.send(`$e LPG ${action.options.preset_number}\r\n`)
+			cmd = `$e LPG ${action.options.preset_number}`
 			break
 
 		case 'get_latest_preset':
-			self.tcp.send('$e GPR\r\n')
+			cmd = '$e GPR' 
 			break
 
 		case 'reboot_dsp':
-			self.tcp.send(`R!\r\n`)
+			cmd = `R!`
 			break
+	}
+
+	if (cmd !== undefined && self.tcp !== undefined && self.tcp.connected) {
+		self.socket.send(`${cmd}\r\n`);
+	} else {
+		debug('TCP not connected to DSP');
 	}
 }
 
@@ -396,7 +390,7 @@ instance.prototype.feedback = function (feedback) {
 	}
 
 	if (feedback.type === 'connected') {
-		if (self.states['connected'] === true) {
+		if (self.tcp.connected === true) {
 			return true
 		}
 	}
