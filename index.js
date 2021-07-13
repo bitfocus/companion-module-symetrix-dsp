@@ -412,17 +412,29 @@ instance.prototype.feedback = function (feedback) {
 			switch (feedback.options.unit_type) {
 				case 'dB':
 					// Still need to add fader min and max values. Default to -72 and +12
+
+					const db = Number(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535))
+
+					// Check if dB is >= 0, add +
+					// Check if dB <= -72, Off
+					// Shorter version could be: ${db >= 0 ? `+${db} dB` : db <= -72 ? 'Off' : `${db} dB`}
+					let dbText
+
+					if (db >= 0) dbText = `+${db.toFixed(1)} dB`
+					else if (db <= -72) dbText = 'Off'
+					else dbText = `${db.toFixed(1)} dB`
+
 					return {
-						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
-							Math.floor(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535))
-						)} dB`,
+						text: `${feedback.options.button_text ? `${feedback.options.button_text}\\n` : ''}${dbText}`,
 					}
 
 				case '%':
+					const precentage = Number(
+						100 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)
+					).toFixed(1)
+
 					return {
-						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
-							100 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)
-						).toFixed(1)}%`,
+						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${precentage}%`,
 					}
 
 				case 'bin':
