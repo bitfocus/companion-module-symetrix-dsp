@@ -22,7 +22,7 @@ function instance(system, id, config) {
 	instance_skel.apply(this, arguments)
 
 	self.actions()
-	
+
 	return self
 }
 
@@ -151,8 +151,8 @@ instance.prototype.init = function () {
 		if (message === 'ACK') return
 
 		// Check if data is from a 'push enabled' control number
-		if (/\\#([0-9]+)\\=([0-9]+)/.test(message)) {
-			const command = message.match(/\\#([0-9]+)\\=([0-9]+)/)
+		if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
+			const command = message.match(/\#([0-9]+)\=([0-9]+)/)
 
 			self.setControlNumberVariable(Number(command[1]), Number(command[2]))
 		}
@@ -308,7 +308,7 @@ instance.prototype.actions = function () {
 instance.prototype.action = function (action) {
 	let self = this
 
-	let cmd;
+	let cmd
 
 	if (action.action == 'reconnect') {
 		self.log('warn', 'Reconnecting to TCP.')
@@ -353,7 +353,7 @@ instance.prototype.action = function (action) {
 			break
 
 		case 'get_latest_preset':
-			cmd = '$e GPR' 
+			cmd = '$e GPR'
 			break
 
 		case 'reboot_dsp':
@@ -362,9 +362,9 @@ instance.prototype.action = function (action) {
 	}
 
 	if (cmd !== undefined && self.tcp !== undefined && self.tcp.connected) {
-		self.socket.send(`${cmd}\r\n`);
+		self.tcp.send(`${cmd}\r\n`)
 	} else {
-		debug('TCP not connected to DSP');
+		debug('TCP not connected to DSP')
 	}
 }
 
