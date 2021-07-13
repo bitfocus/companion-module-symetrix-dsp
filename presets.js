@@ -141,6 +141,7 @@ exports.getPresets = function (self) {
 		release_actions: [
 			{
 				action: 'set_value',
+				delay: 100,
 				options: {
 					control_number: 1,
 					control_value: 0,
@@ -438,7 +439,7 @@ exports.getPresets = function (self) {
 		label: 'Connected',
 		bank: {
 			style: 'text',
-			text: 'Connected\\nto\\nDSP',
+			text: 'Connected\\nto DSP',
 			size: '7',
 			color: self.rgb(255, 255, 255),
 			bgcolor: self.rgb(255, 0, 0),

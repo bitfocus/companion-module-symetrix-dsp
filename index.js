@@ -33,6 +33,7 @@ function instance(system, id, config) {
  */
 instance.prototype.updateConfig = function (config) {
 	let self = this
+
 	self.config = config
 
 	self.log('debug', 'Updating configuration.')
@@ -55,33 +56,61 @@ instance.prototype.setControlNumberVariable = function (control_number, control_
 	let self = this
 
 	// Check if variables already has been declared for specific control number
-	let foundControlNumberVariable = false
-
-	// Loop through existing variables to find the control number
-	for (let i = 0; i < self.variables.length; i++) {
-		if (self.variables[i].name === `control_number_${control_number}`) {
-			foundControlNumberVariable = true
-			break
-		}
-	}
+	let foundControlNumberVariable = self.variables.some(function (variable) {
+		return variable.name === `control_number_${control_number}`
+	})
 
 	// If control number has no variable yet, create one
 	if (!foundControlNumberVariable) {
+		// Binary
 		self.variables.push({
 			name: `control_number_${control_number}`,
-			label: `Control Number #${control_number}`,
+			label: `Control Number ${control_number}`,
+		})
+
+		// dB values
+		self.variables.push({
+			name: `control_number_${control_number}_db`,
+			label: `Control Number ${control_number} dB`,
+		})
+
+		// %
+		self.variables.push({
+			name: `control_number_${control_number}_perc`,
+			label: `Control Number ${control_number} %`,
 		})
 
 		self.setVariableDefinitions(self.variables)
 	}
 
-	// Set state and variable
+	// Set binary state and variable
 	self.states[`control_number_${control_number}`] = control_value
 	self.setVariable(`control_number_${control_number}`, control_value)
 
-	// Trigger on/off and control_value feedback
+	// Set % state and variable
+	const precentage = Number(100 * (self.states[`control_number_${control_number}`] / 65535)).toFixed(1)
+
+	self.states[`control_number_${control_number}_perc`] = precentage
+	self.setVariable(`control_number_${control_number}_perc`, `${precentage}%`)
+
+	// Set dB state and variable
+	// Only works with faders set to default scale -72 and +12
+	const db = Number(-72 + 84 * (self.states[`control_number_${control_number}`] / 65535))
+
+	// Check if dB is >= 0, add +
+	// Check if dB <= -72, Off
+	// Shorter version could be: ${db >= 0 ? `+${db} dB` : db <= -72 ? 'Off' : `${db} dB`}
+	let dbText
+
+	if (db >= 0) dbText = `+${db.toFixed(1)} dB`
+	else if (db <= -72) dbText = 'Off'
+	else dbText = `${db.toFixed(1)} dB`
+
+	self.states[`control_number_${control_number}_db`] = db
+	self.setVariable(`control_number_${control_number}_db`, dbText)
+
+	// Trigger on/off feedback
 	self.checkFeedbacks('on_off_value')
-	self.checkFeedbacks('control_value')
 }
 
 /**
@@ -94,16 +123,22 @@ instance.prototype.init = function () {
 
 	self.states = {}
 	self.feedbacks = {}
+
 	self.variables = [
+		{
+			name: 'connected',
+			label: 'Companion connected to DSP (boolean)',
+		},
 		{
 			name: 'last_preset',
 			label: 'Last recalled preset',
 		},
 	]
 
-	self.initPresets()
-	self.initVariables()
-	self.initFeedbacks()
+	self.setPresetDefinitions(presets.getPresets(self))
+	self.setFeedbackDefinitions(feedbacks.getFeedbacks(self))
+
+	self.setVariableDefinitions(self.variables)
 
 	self.disable = false
 
@@ -125,28 +160,32 @@ instance.prototype.init = function () {
 		self.status(self.STATUS_ERROR)
 		self.log('error', error)
 
+		self.states['connected'] = self.tcp.connected
+		self.setVariable('connected', self.tcp.connected)
 		self.checkFeedbacks('connected')
 	})
 
 	// Catch connect
-	self.tcp.on('connect', async function () {
+	self.tcp.on('connect', function () {
 		self.status(self.STATUS_OK)
 
 		self.debug('Connected to DSP')
 		self.log('info', 'Connected to Control TCP.')
 
+		self.states['connected'] = self.tcp.connected
+		self.setVariable('connected', self.tcp.connected)
 		self.checkFeedbacks('connected')
 
 		// Get Last recalled preset (GRP)
 		self.tcp.send('$e GPR\r\n')
 
 		// Get states for all push enabled controllers (GPU)
-		self.tcp.send('$v GPU\r\n')
+		self.tcp.send('$e GPU\r\n')
 	})
 
 	// Catch incomming data from TCP connection
 	self.tcp.on('data', function (data) {
-		const message = data.toString('utf8').trim()
+		const message = data.toString()
 
 		if (message === 'ACK') return
 
@@ -177,14 +216,28 @@ instance.prototype.init = function () {
 			}
 		}
 
-		// Check if data is from a get command used in combo with $e (GPR)
+		// Check if data is from a get command used in combo with $e (GPR, GS)
 		else if (/{([A-Z]+)(?:\s([0-9]+))?}\s([a-zA-Z0-9]+)/.test(message)) {
-			const command = message.match(/{([A-Z]+)(?:\s([0-9]+))?}\s([a-zA-Z0-9]+)/)
+			const command = message.match(/{([A-Z]+)(?:\s([0-9\r]+))?}\s([a-zA-Z0-9]+)/)
 
 			switch (command[1]) {
 				case 'GPR':
 					self.states['last_preset'] = Number(command[3])
 					self.setVariable('last_preset', self.states['last_preset'])
+					break
+
+				case 'GPU':
+					// Loop through all Push enabled controllers and get their values.
+					command.input
+						.slice(6, -1)
+						.split('\r')
+						.forEach(function (_control_number, i) {
+							// Adding a small delay between TCP commands
+							setTimeout(function () {
+								self.tcp.send(`$e GS ${Number(_control_number)}\r\n`)
+							}, i * 50)
+						})
+
 					break
 
 				case 'GS':
@@ -193,24 +246,6 @@ instance.prototype.init = function () {
 
 				default:
 					break
-			}
-		}
-
-		// Check if data is from the GPU command to get all push enabled controllers
-		else if (message.includes('controllers in range 1 to 10000 enabled for push')) {
-			const pushEnabledControlNumbers = message
-				.split('\r\n')
-				.slice(1, -1)
-				.map(function (number) {
-					return number.trim()
-				})
-
-			// Loop through all Push enabled controllers and get their values.
-			for (let i = 0; i < pushEnabledControlNumbers.length; i++) {
-				// Adding a small delay between TCP commands
-				setTimeout(function timer() {
-					self.tcp.send(`$e GS ${pushEnabledControlNumbers[i]}\r\n`)
-				}, i * 50)
 			}
 		}
 	})
@@ -286,6 +321,8 @@ instance.prototype.destroy = function () {
 
 	self.disable = true
 
+	self.states['connected'] = self.tcp.connected
+	self.setVariable('connected', self.tcp.connected)
 	self.checkFeedbacks('connected')
 
 	debug('destroy', self.id)
@@ -369,16 +406,6 @@ instance.prototype.action = function (action) {
 }
 
 /**
- * Define the feedbacks for Companion
- * @since 1.0.0
- */
-instance.prototype.initFeedbacks = function () {
-	let self = this
-
-	self.setFeedbackDefinitions(feedbacks.getFeedbacks(self))
-}
-
-/**
  * Feedback function
  * @since 1.0.0
  */
@@ -395,80 +422,13 @@ instance.prototype.feedback = function (feedback) {
 		}
 	}
 
-	if (feedback.type === 'on_off_value') {
+	if (feedback.type === `on_off_value`) {
 		if (self.states[`control_number_${feedback.options.control_number}`] > 0) {
 			return true
 		}
 	}
 
-	if (feedback.type === 'control_value') {
-		if (self.states[`control_number_${feedback.options.control_number}`] !== undefined) {
-			switch (feedback.options.unit_type) {
-				case 'dB':
-					// Still need to add fader min and max values. Default to -72 and +12
-
-					const db = Number(-72 + 84 * (self.states[`control_number_${feedback.options.control_number}`] / 65535))
-
-					// Check if dB is >= 0, add +
-					// Check if dB <= -72, Off
-					// Shorter version could be: ${db >= 0 ? `+${db} dB` : db <= -72 ? 'Off' : `${db} dB`}
-					let dbText
-
-					if (db >= 0) dbText = `+${db.toFixed(1)} dB`
-					else if (db <= -72) dbText = 'Off'
-					else dbText = `${db.toFixed(1)} dB`
-
-					return {
-						text: `${feedback.options.button_text ? `${feedback.options.button_text}\\n` : ''}${dbText}`,
-					}
-
-				case '%':
-					const precentage = Number(
-						100 * (self.states[`control_number_${feedback.options.control_number}`] / 65535)
-					).toFixed(1)
-
-					return {
-						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${precentage}%`,
-					}
-
-				case 'bin':
-					return {
-						text: `${feedback.options.button_text ? feedback.options.button_text : ''}\\n${Number(
-							self.states[`control_number_${feedback.options.control_number}`]
-						)}`,
-					}
-
-				default:
-					break
-			}
-		}
-
-		return {
-			text: `${feedback.options.button_text ? feedback.options.button_text : ''}`,
-		}
-	}
-
 	return false
-}
-
-/**
- * Define the dynamic variables for Companion
- * @since 1.0.0
- */
-instance.prototype.initVariables = function () {
-	let self = this
-
-	self.setVariableDefinitions(self.variables)
-}
-
-/**
- * Define the preset buttons for Companion
- * @since 1.0.0
- */
-instance.prototype.initPresets = function () {
-	let self = this
-
-	self.setPresetDefinitions(presets.getPresets(self))
 }
 
 instance_skel.extendedBy(instance)
