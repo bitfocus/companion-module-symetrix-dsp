@@ -1,5 +1,5 @@
 exports.getFeedbacks = function (self) {
-	let feedbacks = {}
+	const feedbacks = {}
 
 	feedbacks['connected'] = {
 		type: 'boolean',
