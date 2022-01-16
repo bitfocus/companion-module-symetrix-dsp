@@ -185,19 +185,21 @@ instance.prototype.init = function () {
 
 	// Catch incomming data from TCP connection
 	self.tcp.on('data', function (data) {
-		const message = data.toString()
+		const message = data.toString('utf-8')
 
 		if (message === 'ACK') return
 
 		// Check if data is from a 'push enabled' control number
 		if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
-			const command = message.match(/\#([0-9]+)\=([0-9]+)/)
+			message.split('\r').forEach(function (line) {
+				const command = line.match(/\#([0-9]+)\=([0-9]+)/)
 
-			self.setControlNumberVariable(Number(command[1]), Number(command[2]))
+				if (command) self.setControlNumberVariable(Number(command[1]), Number(command[2]))
+			})
 		}
 
 		// Check if data is from a set command used in combo with $e (LP, LPG)
-		else if (/{([A-Z]+)\s([0-9]+)}\sACK/.test(message)) {
+		if (/{([A-Z]+)\s([0-9]+)}\sACK/.test(message)) {
 			const command = message.match(/{([A-Z]+)\s([0-9]+)}\sACK/)
 
 			switch (command[1]) {
@@ -237,7 +239,6 @@ instance.prototype.init = function () {
 								self.tcp.send(`$e GS ${Number(_control_number)}\r\n`)
 							}, i * 50)
 						})
-
 					break
 
 				case 'GS':
