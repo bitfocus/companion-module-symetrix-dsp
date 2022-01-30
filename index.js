@@ -185,16 +185,39 @@ instance.prototype.init = function () {
 
 	// Catch incomming data from TCP connection
 	self.tcp.on('data', function (data) {
-		const message = data.toString('utf-8')
+		const message = data.toString('utf-8').trim()
 
 		if (message === 'ACK') return
 
 		// Check if data is from a 'push enabled' control number
-		if (/\#([0-9]+)\=([0-9]+)/.test(message)) {
-			message.split('\r').forEach(function (line) {
-				const command = line.match(/\#([0-9]+)\=([0-9]+)/)
+		const pushdata = message.match(/#([0-9]+)=([0-9]+)/g)
 
-				if (command) self.setControlNumberVariable(Number(command[1]), Number(command[2]))
+		if (pushdata) {
+			pushdata.forEach(function (line) {
+				const command = line.match(/#([0-9]+)=([0-9]+)/)
+
+				if (!command) return
+
+				const controlNumber = Number(command[1])
+				const controlValue = Number(command[2])
+
+				self.setControlNumberVariable(controlNumber, controlValue)
+			})
+		}
+
+		// Check if data is initial from push enabled control numbers
+		const initialControlValues = message.match(/{GS(?:\s([0-9]+))}\s([0-9]+)/g)
+
+		if (initialControlValues) {
+			initialControlValues.forEach(function (matches) {
+				const command = matches.match(/{GS(?:\s([0-9]+))}\s([0-9]+)/)
+
+				if (!command) return
+
+				const controlNumber = Number(command[1])
+				const controlValue = Number(command[2])
+
+				self.setControlNumberVariable(controlNumber, controlValue)
 			})
 		}
 
@@ -218,7 +241,7 @@ instance.prototype.init = function () {
 			}
 		}
 
-		// Check if data is from a get command used in combo with $e (GPR, GS)
+		// Check if data is from a get command used in combo with $e (GPR, GPU)
 		else if (/{([A-Z]+)(?:\s([0-9]+))?}\s([a-zA-Z0-9]+)/.test(message)) {
 			const command = message.match(/{([A-Z]+)(?:\s([0-9\r]+))?}\s([a-zA-Z0-9]+)/)
 
@@ -231,18 +254,11 @@ instance.prototype.init = function () {
 				case 'GPU':
 					// Loop through all Push enabled controllers and get their values.
 					command.input
-						.slice(6, -1)
+						.slice(6)
 						.split('\r')
-						.forEach(function (_control_number, i) {
-							// Adding a small delay between TCP commands
-							setTimeout(function () {
-								self.tcp.send(`$e GS ${Number(_control_number)}\r\n`)
-							}, i * 50)
+						.forEach(function (c) {
+							self.tcp.send(`$e GS ${Number(c)}\r\n`)
 						})
-					break
-
-				case 'GS':
-					self.setControlNumberVariable(Number(command[2]), Number(command[3]))
 					break
 
 				default:
