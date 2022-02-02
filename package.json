@@ -13,11 +13,15 @@
 	"description": "Symetrix DSP plugin for companion",
 	"main": "index.js",
 	"scripts": {},
-    "repository": {
-        "type": "git",
-        "url": "git@github.com:bitfocus/companion-module-symetrix-dsp.git"
-    },
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bitfocus/companion-module-symetrix-dsp.git"
+	},
 	"author": "Sydney Smit <smit.sydney@gmail.com>",
 	"license": "MIT",
-	"dependencies": {}
+	"dependencies": {},
+	"homepage": "https://github.com/bitfocus/companion-module-symetrix-dsp#readme",
+	"bugs": {
+		"url": "https://github.com/bitfocus/companion-module-symetrix-dsp/issues"
+	}
 }
