@@ -1,27 +1,17 @@
 {
 	"name": "symetrix-dsp",
-	"version": "1.5.1",
-	"api_version": "1.0.0",
-	"keywords": [
-		"Symetrix",
-		"DSP",
-		"Audio"
-	],
-	"manufacturer": "Symetrix",
-	"product": "DSP",
-	"shortname": "symetrix",
-	"description": "Symetrix DSP plugin for companion",
+	"version": "2.0.0",
 	"main": "index.js",
 	"scripts": {},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/bitfocus/companion-module-symetrix-dsp.git"
 	},
-	"author": "Sydney Smit <smit.sydney@gmail.com>",
 	"license": "MIT",
-	"dependencies": {},
-	"homepage": "https://github.com/bitfocus/companion-module-symetrix-dsp#readme",
-	"bugs": {
-		"url": "https://github.com/bitfocus/companion-module-symetrix-dsp/issues"
+	"dependencies": {
+		"@companion-module/base": "~1.1.1"
+	},
+	"devDependencies": {
+		"@companion-module/tools": "~1.0"
 	}
 }
