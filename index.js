@@ -288,20 +288,20 @@ class SymetrixDSPInstance extends InstanceBase {
     if (!foundControlNumberVariable) {
       // Binary
       self.variables.push({
-        name: `control_number_${control_number}`,
-        label: `Control Number ${control_number}`,
+        variableId: `control_number_${control_number}`,
+        name: `Control Number ${control_number}`,
       });
 
       // dB values
       self.variables.push({
-        name: `control_number_${control_number}_db`,
-        label: `Control Number ${control_number} dB`,
+        variableId: `control_number_${control_number}_db`,
+        name: `Control Number ${control_number} dB`,
       });
 
       // %
       self.variables.push({
-        name: `control_number_${control_number}_perc`,
-        label: `Control Number ${control_number} %`,
+        variableId: `control_number_${control_number}_perc`,
+        name: `Control Number ${control_number} %`,
       });
 
       self.setVariableDefinitions(self.variables);
@@ -311,11 +311,11 @@ class SymetrixDSPInstance extends InstanceBase {
     self.states[`control_number_${control_number}`] = control_value;
 
     // Set % state and variable
-    const precentage = Number(
+    const percentage = Number(
       100 * (self.states[`control_number_${control_number}`] / 65535)
     ).toFixed(1);
 
-    self.states[`control_number_${control_number}_perc`] = precentage;
+    self.states[`control_number_${control_number}_perc`] = percentage;
 
     // Set dB state and variable
     // Only works with faders set to default scale -72 and +12
@@ -335,7 +335,7 @@ class SymetrixDSPInstance extends InstanceBase {
     self.states[`control_number_${control_number}_db`] = db;
     self.setVariableValues({
       [`control_number_${control_number}`]: control_value,
-      [`control_number_${control_number}_perc`]: `${precentage}%`,
+      [`control_number_${control_number}_perc`]: `${percentage}%`,
       [`control_number_${control_number}_db`]: dbText,
     });
 
