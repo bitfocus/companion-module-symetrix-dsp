@@ -17,7 +17,7 @@ exports.getFeedbacks = function (self) {
       if (self.tcp.isConnected === true) {
         return true;
       } else {
-		return false;
+	    return false;
 	  }
     },
   };
@@ -33,23 +33,20 @@ exports.getFeedbacks = function (self) {
     },
     options: [
       {
-        type: "number",
+        type: "textinput",
         label: "Control Number",
         id: "control_number",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        default: "1",
+        useVariables: true,
         required: true,
       },
     ],
-    callback: (feedback) => {
-      if (
-        self.states[`control_number_${feedback.options.control_number}`] > 0
-      ) {
+    callback: async (feedback) => {
+      const controlNumber = parseInt(await self.parseVariablesInString(feedback.options.control_number));
+      if (self.states[`control_number_${controlNumber}`] > 0) {
         return true;
       } else {
-		return false;
+	    return false;
 	  }
     },
   };

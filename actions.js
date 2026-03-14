@@ -15,20 +15,19 @@ exports.getActions = function (self) {
     name: "Flash DSP",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "amout_flashes",
         label: "Flashes",
-        tooltip: "Amount the unit will flash",
-        default: 4,
-        min: 1,
-        max: 20,
-        range: false,
+        tooltip: "Amount the unit will flash (1-20), supports variables",
+        default: "4",
+        useVariables: true,
         required: true,
         width: 4,
       },
     ],
-    callback: (action) => {
-      sendTCP(`FU ${action.options.amout_flashes}`);
+    callback: async (action) => {
+      const flashes = parseInt(await self.parseVariablesInString(action.options.amout_flashes));
+      sendTCP(`FU ${flashes}`);
     },
   };
 
@@ -55,20 +54,19 @@ exports.getActions = function (self) {
     name: "Load Global Preset",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "preset_number",
         label: "Preset number",
-        tooltip: "Number of preset",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        tooltip: "Number of preset (1-1000), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
     ],
-    callback: (action) => {
-      sendTCP(`$e LPG ${action.options.preset_number}`);
+    callback: async (action) => {
+      const preset = parseInt(await self.parseVariablesInString(action.options.preset_number));
+      sendTCP(`$e LPG ${preset}`);
     },
   };
 
@@ -77,20 +75,19 @@ exports.getActions = function (self) {
     name: "Load Preset",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "preset_number",
         label: "Preset number",
-        tooltip: "Number of preset",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        tooltip: "Number of preset (1-1000), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
     ],
-    callback: (action) => {
-      sendTCP(`$e LP ${action.options.preset_number}`);
+    callback: async (action) => {
+      const preset = parseInt(await self.parseVariablesInString(action.options.preset_number));
+      sendTCP(`$e LP ${preset}`);
     },
   };
 
@@ -99,34 +96,30 @@ exports.getActions = function (self) {
     name: "Set Value",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "control_number",
         label: "Control number",
-        tooltip: "Number of control",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        tooltip: "Number of control (1-1000), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
       {
-        type: "number",
+        type: "textinput",
         id: "control_value",
         label: "Control value (min: 0 / max: 65535)",
-        tooltip: "Value of control (min: 0 / max: 65535)",
-        default: 1,
-        min: 0,
-        max: 65535,
-        range: false,
+        tooltip: "Value of control (0-65535), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
     ],
-    callback: (action) => {
-      sendTCP(
-        `$e CS ${action.options.control_number} ${action.options.control_value}`
-      );
+    callback: async (action) => {
+      const controlNumber = parseInt(await self.parseVariablesInString(action.options.control_number));
+      const controlValue = parseInt(await self.parseVariablesInString(action.options.control_value));
+      sendTCP(`$e CS ${controlNumber} ${controlValue}`);
     },
   };
 
@@ -135,14 +128,12 @@ exports.getActions = function (self) {
     name: "Change Value",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "control_number",
         label: "Control number",
-        tooltip: "Number of control",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        tooltip: "Number of control (1-1000), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 2,
       },
@@ -160,22 +151,20 @@ exports.getActions = function (self) {
         width: 2,
       },
       {
-        type: "number",
+        type: "textinput",
         id: "control_value",
         label: "Control value (min: 0 / max: 65535)",
-        tooltip: "Value of control (min: 0 / max: 65535)",
-        default: 1,
-        min: 0,
-        max: 65535,
-        range: false,
+        tooltip: "Value of control (0-65535), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 2,
       },
     ],
-    callback: (action) => {
-      sendTCP(
-        `$e CC ${action.options.control_number} ${action.options.change_type} ${action.options.control_value}`
-      );
+    callback: async (action) => {
+      const controlNumber = parseInt(await self.parseVariablesInString(action.options.control_number));
+      const controlValue = parseInt(await self.parseVariablesInString(action.options.control_value));
+      sendTCP(`$e CC ${controlNumber} ${action.options.change_type} ${controlValue}`);
     },
   };
 
@@ -184,39 +173,33 @@ exports.getActions = function (self) {
     name: "On / Off",
     options: [
       {
-        type: "number",
+        type: "textinput",
         id: "control_number",
         label: "Control number",
-        tooltip: "Number of control",
-        default: 1,
-        min: 1,
-        max: 1000,
-        range: false,
+        tooltip: "Number of control (1-1000), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
       {
-        type: "number",
+        type: "textinput",
         id: "on_value",
         label: "On value (min: 1 / max: 65535)",
-        tooltip: `value to set when 'on' state is triggered`,
-        default: 1,
-        min: 1,
-        max: 65535,
-        range: false,
+        tooltip: "Value to set when 'on' state is triggered (1-65535), supports variables",
+        default: "1",
+        useVariables: true,
         required: true,
         width: 4,
       },
     ],
-    callback: (action) => {
-      if (
-        self.states[`control_number_${action.options.control_number}`] === 0
-      ) {
-        sendTCP(
-          `CS ${action.options.control_number} ${action.options.on_value}`
-        );
+    callback: async (action) => {
+      const controlNumber = parseInt(await self.parseVariablesInString(action.options.control_number));
+      const onValue = parseInt(await self.parseVariablesInString(action.options.on_value));
+      if (self.states[`control_number_${controlNumber}`] === 0) {
+        sendTCP(`CS ${controlNumber} ${onValue}`);
       } else {
-        sendTCP(`CS ${action.options.control_number} ${0}`);
+        sendTCP(`CS ${controlNumber} ${0}`);
       }
     },
   };
